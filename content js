@@ -1,0 +1,74 @@
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg.action === "getProductInfo") {
+    const title = document.querySelector('[data-testid="product-name"]')?.innerText.trim() || "Name not found";
+    const brand = document.querySelector('[data-testid="product-brand"]')?.innerText.trim() || "Brand not found";
+    const price = document.querySelector('[data-testid="product-price"]')?.innerText.trim() || "Price not found";
+
+    // Try multiple selectors for rating
+    let rating = null;
+    rating = document.querySelector('[data-testid="product-rating"]')?.innerText;
+
+    if (!rating) {
+      const starElement = document.querySelector('[aria-label*="out of 5 stars"]');
+      if (starElement) {
+        const match = starElement.getAttribute('aria-label').match(/([\d\.]+) out of 5 stars/);
+        if (match) rating = match[1];
+      }
+    }
+
+    if (!rating) {
+      rating = document.querySelector('.rating-value')?.innerText;
+    }
+
+    if (!rating) {
+      const starContainer = document.querySelector('span.css-15eomys');
+      if (starContainer) {
+        const ratingDiv = starContainer.parentElement.querySelector('div.css-1r68oyn');
+        if (ratingDiv) rating = ratingDiv.innerText;
+      }
+    }
+
+    if (typeof rating === "string") rating = rating.trim();
+
+    function isInBanner(img) {
+      return img.closest('.banner, .hero, .advertisement, .promo, .carousel, .contenthub, .ad-container');
+    }
+
+    const candidates = Array.from(document.querySelectorAll('img')).filter(img => {
+      const rect = img.getBoundingClientRect();
+      return (
+        rect.width > 300 && rect.height > 300 &&
+        img.complete && img.naturalWidth > 300 && img.naturalHeight > 300 &&
+        !isInBanner(img) &&
+        window.getComputedStyle(img).display !== 'none' &&
+        window.getComputedStyle(img).visibility !== 'hidden' &&
+        img.alt && img.alt.trim() !== ''
+      );
+    });
+
+    let productImg = null;
+    const productNameEl = document.querySelector('[data-testid="product-name"]');
+    if (productNameEl) {
+      for (const img of candidates) {
+        if (productNameEl.contains(img) || img.closest('[data-testid="product-info"], [data-testid="product-details"]')) {
+          productImg = img.src;
+          break;
+        }
+      }
+    }
+    if (!productImg && candidates.length > 0) {
+      productImg = candidates[0].src;
+    }
+
+    sendResponse({
+      title,
+      brand,
+      price,
+      rating: rating || "No rating",
+      image: productImg,
+      url: window.location.href,
+    });
+
+    return true; // Keep message channel open for async
+  }
+});
